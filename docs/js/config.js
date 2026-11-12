@@ -8,9 +8,9 @@
 //                https://apps.apple.com/app/id1234567890
 // supportEmail — почта для жалоб и вопросов (Apple требует контакт для связи)
 export const DEFAULT_CONFIG = {
-  supabaseUrl: '',    // ← обязательно: https://xxxx.supabase.co
-  supabaseKey: '',    // ← обязательно: публичный ключ sb_publishable_… или anon public
+  supabaseUrl: 'https://zfapomqgkrmflikvwjhm.supabase.co',  // без /rest/v1/ — приложение добавляет путь само
+  supabaseKey: 'sb_publishable_z1_lUOEx4IiHpBZYB2-Cyw_WtvgP9yu',  // публичный ключ: можно публиковать, данные защищают RLS-политики
   webUrl: '',         // ← адрес веб-версии: https://ЛОГИН.github.io/team-tracker-gps/
   appStoreUrl: '',    // ← после публикации: https://apps.apple.com/app/idXXXXXXXXXX
-  supportEmail: ''    // ← обязательно для App Store: почта для жалоб и вопросов
+  supportEmail: 'vladlen.chirukhin@gmail.com'  // почта для жалоб и вопросов
 };
