@@ -67,6 +67,7 @@ docs/                     веб-приложение: его же показы�
 ios/                      Xcode-проект iOS-приложения (Capacitor 7, Swift Package Manager)
 .github/workflows/ios-testflight.yml   сборка в облаке GitHub и загрузка в App Store Connect
 supabase/schema.sql       база данных (выполнить в Supabase)
+supabase/smoke-test.sql   проверка записи: прогнать после обновления схемы
 store/app-store-ru.md     тексты для страницы в App Store и ответы на анкеты Apple
 package.json, capacitor.config.json   настройки сборки
 ```
