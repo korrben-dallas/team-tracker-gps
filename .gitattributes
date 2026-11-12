@@ -1,0 +1,5 @@
+# Единые переводы строк: скрипты workflow и JS должны попадать в репозиторий с LF,
+# иначе сборка на macOS/Linux может упасть на \r в shell-блоках.
+* text=auto eol=lf
+*.png binary
+*.jpg binary

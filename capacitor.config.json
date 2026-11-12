@@ -1,0 +1,11 @@
+{
+  "appId": "ru.teamtracker.gps",
+  "appName": "Team Tracker GPS",
+  "webDir": "docs",
+  "backgroundColor": "#16261d",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#16261d",
+    "limitsNavigationsToAppBoundDomains": false
+  }
+}

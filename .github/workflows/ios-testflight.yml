@@ -1,0 +1,109 @@
+# Сборка iOS-приложения в облаке GitHub (Mac не нужен) и загрузка в TestFlight / App Store Connect.
+# Запуск: вкладка Actions → «iOS → TestFlight» → Run workflow.
+# Нужны секреты репозитория (Settings → Secrets and variables → Actions), см. README.md:
+#   APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8_BASE64
+name: iOS → TestFlight
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      # Раньше падало уже после загрузки в App Store: приложение уходило в TestFlight без адреса сервера.
+      - name: Проверка конфигурации
+        run: |
+          set -euo pipefail
+          ok=1
+          for key in supabaseUrl supabaseKey; do
+            if grep -qE "^[[:space:]]*${key}:[[:space:]]*''" docs/js/config.js; then
+              echo "::error::docs/js/config.js: не заполнен ${key}. Впишите адрес и публичный ключ Supabase (README, шаг 1) — без них приложение не подключится к серверу."
+              ok=0
+            fi
+          done
+          [ "$ok" -eq 1 ] || exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Установка зависимостей
+        run: npm ci
+
+      - name: Копирование веб-части в iOS-проект
+        run: npx cap sync ios
+
+      # В macOS нет `sort -V` (это GNU-расширение), поэтому версии сравниваем в Python.
+      - name: Выбор самой новой версии Xcode
+        run: |
+          set -euo pipefail
+          LATEST=$(python3 -c '
+          import glob, re
+          def key(path):
+              m = re.search(r"Xcode_?([0-9.]*)\.app$", path)
+              return [int(part) for part in (m.group(1) if m else "0").strip(".").split(".") if part]
+          paths = sorted(glob.glob("/Applications/Xcode*.app"), key=key)
+          print(paths[-1] if paths else "")
+          ')
+          if [ -z "$LATEST" ]; then echo "::error::В /Applications не найден ни один Xcode."; exit 1; fi
+          echo "Выбран $LATEST"
+          sudo xcode-select -s "$LATEST"
+          xcodebuild -version
+
+      - name: Ключ App Store Connect API
+        env:
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          # openssl вместо base64: в macOS утилита base64 — BSD-версия, флаг --decode у неё не гарантирован.
+          printf '%s' "$ASC_KEY_P8_BASE64" | tr -d '\r\n' | openssl base64 -d -A > "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
+          grep -q 'BEGIN PRIVATE KEY' "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8" || { echo "::error::ASC_KEY_P8_BASE64 не похож на ключ .p8 — проверьте секрет."; exit 1; }
+
+      - name: Сборка архива
+        env:
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          xcodebuild archive \
+            -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$KEY_ID.p8" \
+            -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER" \
+            DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="${{ github.run_number }}"
+
+      - name: Загрузка в App Store Connect
+        env:
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$TEAM</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$KEY_ID.p8" \
+            -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER"
+          echo "Готово: сборка ${{ github.run_number }} отправлена в App Store Connect. Через 10–30 минут она появится в TestFlight."
