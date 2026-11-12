@@ -10,7 +10,7 @@
 export const DEFAULT_CONFIG = {
   supabaseUrl: 'https://zfapomqgkrmflikvwjhm.supabase.co',  // без /rest/v1/ — приложение добавляет путь само
   supabaseKey: 'sb_publishable_z1_lUOEx4IiHpBZYB2-Cyw_WtvgP9yu',  // публичный ключ: можно публиковать, данные защищают RLS-политики
-  webUrl: '',         // ← адрес веб-версии: https://ЛОГИН.github.io/team-tracker-gps/
+  webUrl: 'https://korrben-dallas.github.io/team-tracker-gps/',  // веб-версия на GitHub Pages
   appStoreUrl: '',    // ← после публикации: https://apps.apple.com/app/idXXXXXXXXXX
   supportEmail: 'vladlen.chirukhin@gmail.com'  // почта для жалоб и вопросов
 };
